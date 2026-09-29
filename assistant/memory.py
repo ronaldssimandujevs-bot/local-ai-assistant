@@ -1,111 +1,51 @@
-import sqlite3
-from pathlib import Path
+import re
 
 
-class MemoryStore:
-    def __init__(self, database_path: str):
-        self.database_path = Path(database_path)
-        self.database_path.parent.mkdir(parents=True, exist_ok=True)
-        self._init_db()
+class TaskPlanner:
+    def plan(self, prompt: str):
+        text = prompt.strip()
+        lowered = text.lower()
 
-    def _connect(self):
-        conn = sqlite3.connect(str(self.database_path))
-        conn.row_factory = sqlite3.Row
-        return conn
+        if re.search(r"(?:remember|prefer|like|want|always).*?(?:i\s+)?(?:prefer|like|want|am\s+happy\s+with)", lowered):
+            match = re.search(r"(?:prefer|like|want|remember|always)\s+(?:that\s+)?(?:i\s+)?(?:prefer|like|want|am\s+happy\s+with)?\s*(.+)$", lowered)
+            value = (match.group(1) if match else text).strip(" .?!")
+            return {"category": "preference", "value": value}
 
-    def _init_db(self):
-        with self._connect() as conn:
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS interactions (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
-                    user_input TEXT,
-                    assistant_output TEXT,
-                    category TEXT
-                )
-                """
-            )
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS feedback (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    session_id TEXT,
-                    rating INTEGER,
-                    note TEXT,
-                    timestamp TEXT DEFAULT CURRENT_TIMESTAMP
-                )
-                """
-            )
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS preferences (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    key TEXT UNIQUE,
-                    value TEXT,
-                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-                )
-                """
-            )
-            conn.commit()
+        if "search" in lowered or "look up" in lowered or "latest" in lowered or "news" in lowered:
+            for prefix in ("search ", "look up ", "latest "):
+                if lowered.startswith(prefix):
+                    value = text[len(prefix):].strip()
+                    return {"category": "search", "value": value}
+            return {"category": "search", "value": text}
 
-    def record_interaction(self, user_input: str, assistant_output: str, category: str):
-        with self._connect() as conn:
-            conn.execute(
-                "INSERT INTO interactions (user_input, assistant_output, category) VALUES (?, ?, ?)",
-                (user_input, assistant_output, category),
-            )
-            conn.commit()
+        if "read file" in lowered or "open file" in lowered:
+            value = text.replace("read file", "").replace("open file", "").strip().strip('"\'')
+            return {"category": "read_file", "value": value or "README.md"}
 
-    def record_feedback(self, session_id: str, rating: int, note: str):
-        with self._connect() as conn:
-            conn.execute(
-                "INSERT INTO feedback (session_id, rating, note) VALUES (?, ?, ?)",
-                (session_id, rating, note),
-            )
-            conn.commit()
+        if "read " in lowered and "." in lowered:
+            value = text.replace("read ", "", 1).strip().strip('"\'')
+            return {"category": "read_file", "value": value}
 
-    def remember_preference(self, key: str, value: str):
-        with self._connect() as conn:
-            conn.execute(
-                "INSERT INTO preferences (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP",
-                (key, value),
-            )
-            conn.commit()
+        if "write file" in lowered or "create file" in lowered or "modify file" in lowered:
+            raw = text
+            if "write file" in lowered:
+                raw = raw.split("write file", 1)[1].strip()
+            elif "create file" in lowered:
+                raw = raw.split("create file", 1)[1].strip()
+            else:
+                raw = raw.split("modify file", 1)[1].strip()
 
-    def get_preference(self, key: str):
-        with self._connect() as conn:
-            row = conn.execute("SELECT value FROM preferences WHERE key = ?", (key,)).fetchone()
-            return row["value"] if row else None
+            if " with content " in lowered:
+                path, content = raw.split(" with content ", 1)
+                return {"category": "write_file", "path": path.strip().strip('"\''), "value": content.strip()}
 
-    def get_preferences(self):
-        with self._connect() as conn:
-            rows = conn.execute(
-                "SELECT key, value FROM preferences ORDER BY updated_at DESC"
-            ).fetchall()
-            return {row["key"]: row["value"] for row in rows}
+            return {"category": "write_file", "path": raw.strip().strip('"\''), "value": ""}
 
-    def get_recent(self, limit: int = 10):
-        with self._connect() as conn:
-            rows = conn.execute(
-                "SELECT timestamp, user_input, assistant_output, category FROM interactions ORDER BY id DESC LIMIT ?",
-                (limit,),
-            ).fetchall()
-            results = []
-            for row in rows:
-                results.append(
-                    {
-                        "timestamp": row["timestamp"],
-                        "user_input": row["user_input"],
-                        "assistant_output": row["assistant_output"],
-                        "category": row["category"],
-                    }
-                )
-            return list(reversed(results))
+        if "self update" in lowered or "update your own code" in lowered or "update yourself" in lowered:
+            return {"category": "self_update", "value": text}
 
-    def get_feedback_summary(self):
-        with self._connect() as conn:
-            rows = conn.execute(
-                "SELECT rating, COUNT(*) as count FROM feedback GROUP BY rating ORDER BY rating"
-            ).fetchall()
-            return [{"rating": row["rating"], "count": row["count"]} for row in rows]
+        if lowered.startswith("run ") or "execute" in lowered or "shell" in lowered:
+            command = text.replace("run ", "", 1).strip() if lowered.startswith("run ") else text.strip()
+            return {"category": "run_shell", "value": command}
+
+        return {"category": "chat", "value": text}

@@ -1,87 +1,128 @@
-const chatEl = document.getElementById('chat');
-const formEl = document.getElementById('chat-form');
-const inputEl = document.getElementById('message');
-const voiceButtonEl = document.getElementById('voice-button');
-const allowCodeEl = document.getElementById('allow-code');
-const allowShellEl = document.getElementById('allow-shell');
-const allowSelfUpdateEl = document.getElementById('allow-self-update');
-const quickActionButtons = document.querySelectorAll('.chip');
+import sqlite3
+from pathlib import Path
 
-let recognition;
 
-function addMessage(sender, text) {
-  const message = document.createElement('div');
-  message.className = `message ${sender}`;
-  message.textContent = text;
-  chatEl.appendChild(message);
-  chatEl.scrollTop = chatEl.scrollHeight;
-}
+class MemoryStore:
+    def __init__(self, database_path: str):
+        self.database_path = Path(database_path)
+        self.database_path.parent.mkdir(parents=True, exist_ok=True)
+        self._init_db()
 
-async function sendMessage(text) {
-  addMessage('user', text);
+    def _connect(self):
+        conn = sqlite3.connect(str(self.database_path))
+        conn.row_factory = sqlite3.Row
+        return conn
 
-  const payload = {
-    message: text,
-    allow_code_changes: allowCodeEl.checked,
-    allow_shell: allowShellEl.checked,
-    approved_self_update: allowSelfUpdateEl.checked,
-    self_update_files: []
-  };
+    def _init_db(self):
+        with self._connect() as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS interactions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+                    user_input TEXT,
+                    assistant_output TEXT,
+                    category TEXT
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS feedback (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT,
+                    rating INTEGER,
+                    note TEXT,
+                    timestamp TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS preferences (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    key TEXT UNIQUE,
+                    value TEXT,
+                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            conn.commit()
 
-  const response = await fetch('/api/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
+    def record_interaction(self, user_input: str, assistant_output: str, category: str):
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT INTO interactions (user_input, assistant_output, category) VALUES (?, ?, ?)",
+                (user_input, assistant_output, category),
+            )
+            conn.commit()
 
-  const data = await response.json();
-  addMessage('assistant', data.response);
+    def record_feedback(self, session_id: str, rating: int, note: str):
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT INTO feedback (session_id, rating, note) VALUES (?, ?, ?)",
+                (session_id, rating, note),
+            )
+            conn.commit()
 
-  if (data.actions && data.actions.length) {
-    const actionList = data.actions.map((action) => JSON.stringify(action)).join('\n');
-    addMessage('system', `Actions:\n${actionList}`);
-  }
-}
+    def remember_preference(self, key: str, value: str):
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT INTO preferences (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP",
+                (key, value),
+            )
+            conn.commit()
 
-formEl.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const value = inputEl.value.trim();
-  if (!value) return;
-  inputEl.value = '';
-  await sendMessage(value);
-});
+    def get_preference(self, key: str):
+        with self._connect() as conn:
+            row = conn.execute("SELECT value FROM preferences WHERE key = ?", (key,)).fetchone()
+            return row["value"] if row else None
 
-quickActionButtons.forEach((button) => {
-  button.addEventListener('click', () => {
-    inputEl.value = button.dataset.message;
-    formEl.requestSubmit();
-  });
-});
+    def get_preferences(self):
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT key, value FROM preferences ORDER BY updated_at DESC"
+            ).fetchall()
+            return {row["key"]: row["value"] for row in rows}
 
-if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-  const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
-  recognition = new SpeechRecognitionClass();
-  recognition.lang = 'en-US';
-  recognition.interimResults = false;
-  recognition.continuous = false;
+    def get_recent(self, limit: int = 10):
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT timestamp, user_input, assistant_output, category FROM interactions ORDER BY id DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+            return list(reversed([
+                {
+                    "timestamp": row["timestamp"],
+                    "user_input": row["user_input"],
+                    "assistant_output": row["assistant_output"],
+                    "category": row["category"],
+                }
+                for row in rows
+            ]))
 
-  recognition.onresult = (event) => {
-    const transcript = event.results[0][0].transcript;
-    inputEl.value = transcript;
-    sendMessage(transcript);
-  };
+    def get_feedback_summary(self):
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT rating, COUNT(*) as count FROM feedback GROUP BY rating ORDER BY rating"
+            ).fetchall()
+            return [{"rating": row["rating"], "count": row["count"]} for row in rows]
 
-  recognition.onerror = () => {
-    addMessage('assistant', 'I could not hear the microphone properly.');
-  };
+    def get_learning_summary(self):
+        with self._connect() as conn:
+            interaction_counts = conn.execute(
+                "SELECT category, COUNT(*) AS count FROM interactions GROUP BY category ORDER BY count DESC"
+            ).fetchall()
+            preferences = conn.execute(
+                "SELECT key, value FROM preferences ORDER BY updated_at DESC LIMIT 10"
+            ).fetchall()
+            feedback = conn.execute(
+                "SELECT AVG(rating) AS average_rating, COUNT(*) AS total FROM feedback"
+            ).fetchone()
 
-  voiceButtonEl.addEventListener('click', () => {
-    recognition.start();
-    addMessage('assistant', 'Listening...');
-  });
-} else {
-  voiceButtonEl.textContent = 'Voice unavailable';
-  voiceButtonEl.disabled = true;
-}
-
-addMessage('assistant', 'Welcome. I run locally on your computer and can help with voice, search, file work, and explicit self-updates.');
+            return {
+                "interaction_counts": [{"category": row["category"], "count": row["count"]} for row in interaction_counts],
+                "preferences": [{"key": row["key"], "value": row["value"]} for row in preferences],
+                "average_feedback_rating": float(feedback["average_rating"]) if feedback["average_rating"] is not None else 0.0,
+                "feedback_count": feedback["total"] if feedback["total"] is not None else 0,
+            }

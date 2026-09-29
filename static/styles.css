@@ -1,184 +1,67 @@
-body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  background: #0b1020;
-  color: #edf2ff;
-}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Local AI Assistant</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand-block">
+          <p class="eyebrow">Local server</p>
+          <h1>AI Assistant</h1>
+        </div>
 
-.app-shell {
-  display: grid;
-  grid-template-columns: 260px 1fr;
-  height: 100vh;
-}
+        <div class="sidebar-section">
+          <p class="section-label">Capabilities</p>
+          <ul class="capability-list">
+            <li>Voice</li>
+            <li>Search</li>
+            <li>Files</li>
+            <li>Self-update</li>
+            <li>Learning memory</li>
+          </ul>
+        </div>
 
-.sidebar {
-  background: #111827;
-  padding: 24px 18px;
-  border-right: 1px solid #1f2937;
-}
+        <div class="sidebar-section toggles">
+          <label><input type="checkbox" id="allow-code" /> Allow code changes</label>
+          <label><input type="checkbox" id="allow-shell" /> Allow shell execution</label>
+          <label><input type="checkbox" id="allow-self-update" /> Allow self-update</label>
+        </div>
+      </aside>
 
-.brand-block h1 {
-  margin: 0;
-  font-size: 2rem;
-}
+      <main class="main-panel">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Computer assistant</p>
+            <h2>Local Execution Panel</h2>
+          </div>
+          <button id="voice-button" class="primary-btn">Start Voice</button>
+        </header>
 
-.sidebar-section {
-  margin-top: 26px;
-}
+        <div class="status-strip">
+          <span class="status-pill">Local mode</span>
+          <span class="status-pill muted">Safe execution</span>
+          <span class="status-pill muted">Learning on</span>
+        </div>
 
-.section-label {
-  color: #94a3b8;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin-bottom: 10px;
-}
+        <section id="chat" class="chat-panel"></section>
 
-.capability-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
+        <div class="quick-actions">
+          <button type="button" class="chip" data-message="Search for the latest AI news">Search</button>
+          <button type="button" class="chip" data-message="Read file README.md">Read file</button>
+          <button type="button" class="chip" data-message="Write file notes.txt with content Hello from my assistant">Write file</button>
+        </div>
 
-.capability-list li {
-  margin: 10px 0;
-  color: #cbd5e1;
-}
+        <form id="chat-form" class="composer">
+          <input id="message" type="text" placeholder="Ask me to search, code, write, or update" autocomplete="off" />
+          <button type="submit">Send</button>
+        </form>
+      </main>
+    </div>
 
-.toggles {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  color: #dbeafe;
-}
-
-.main-panel {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-}
-
-.topbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 18px 22px;
-  border-bottom: 1px solid #1f2937;
-  background: #0f172a;
-}
-
-.eyebrow {
-  margin: 0;
-  color: #94a3b8;
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.status-strip {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  padding: 12px 20px;
-  background: #0f172a;
-  border-bottom: 1px solid #1f2937;
-}
-
-.status-pill {
-  display: inline-block;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: #1d4ed8;
-  color: #eff6ff;
-  font-size: 12px;
-}
-
-.status-pill.muted {
-  background: #1f2937;
-  color: #cbd5e1;
-}
-
-.primary-btn,
-.composer button,
-.chip {
-  background: #2563eb;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  padding: 10px 16px;
-  cursor: pointer;
-}
-
-.quick-actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  padding: 12px 20px 0;
-}
-
-.chip {
-  background: #1f2937;
-  border: 1px solid #334155;
-}
-
-.chat-panel {
-  flex: 1;
-  overflow-y: auto;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.message {
-  max-width: 75%;
-  padding: 12px 16px;
-  border-radius: 12px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-}
-
-.message.user {
-  align-self: flex-end;
-  background: #1d4ed8;
-}
-
-.message.assistant {
-  align-self: flex-start;
-  background: #1f2937;
-}
-
-.message.system {
-  align-self: stretch;
-  background: #111827;
-  color: #dbeafe;
-  font-size: 12px;
-}
-
-.composer {
-  display: flex;
-  gap: 12px;
-  padding: 15px 20px 22px;
-  border-top: 1px solid #1f2937;
-  background: #0f172a;
-}
-
-.composer input {
-  flex: 1;
-  padding: 14px 16px;
-  border-radius: 10px;
-  border: 1px solid #334155;
-  background: #111827;
-  color: white;
-}
-
-@media (max-width: 800px) {
-  .app-shell {
-    grid-template-columns: 1fr;
-  }
-
-  .sidebar {
-    border-right: none;
-    border-bottom: 1px solid #1f2937;
-  }
-}
+    <script src="/static/app.js"></script>
+  </body>
+</html>

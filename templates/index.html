@@ -1,67 +1,94 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Local AI Assistant</title>
-    <link rel="stylesheet" href="/static/styles.css" />
-  </head>
-  <body>
-    <div class="app-shell">
-      <aside class="sidebar">
-        <div class="brand-block">
-          <p class="eyebrow">Local server</p>
-          <h1>AI Assistant</h1>
-        </div>
+const chatEl = document.getElementById('chat');
+const formEl = document.getElementById('chat-form');
+const inputEl = document.getElementById('message');
+const voiceButtonEl = document.getElementById('voice-button');
+const allowCodeEl = document.getElementById('allow-code');
+const allowShellEl = document.getElementById('allow-shell');
+const allowSelfUpdateEl = document.getElementById('allow-self-update');
+const quickActionButtons = document.querySelectorAll('.chip');
 
-        <div class="sidebar-section">
-          <p class="section-label">Capabilities</p>
-          <ul class="capability-list">
-            <li>Voice</li>
-            <li>Search</li>
-            <li>Files</li>
-            <li>Self-update</li>
-            <li>Learning memory</li>
-          </ul>
-        </div>
+let recognition;
 
-        <div class="sidebar-section toggles">
-          <label><input type="checkbox" id="allow-code" /> Allow code changes</label>
-          <label><input type="checkbox" id="allow-shell" /> Allow shell execution</label>
-          <label><input type="checkbox" id="allow-self-update" /> Allow self-update</label>
-        </div>
-      </aside>
+function addMessage(sender, text) {
+  const message = document.createElement('div');
+  message.className = `message ${sender}`;
+  message.textContent = text;
+  chatEl.appendChild(message);
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
 
-      <main class="main-panel">
-        <header class="topbar">
-          <div>
-            <p class="eyebrow">Computer assistant</p>
-            <h2>Local Execution Panel</h2>
-          </div>
-          <button id="voice-button" class="primary-btn">Start Voice</button>
-        </header>
+async function sendMessage(text) {
+  addMessage('user', text);
 
-        <div class="status-strip">
-          <span class="status-pill">Local mode</span>
-          <span class="status-pill muted">Safe execution</span>
-          <span class="status-pill muted">Learning on</span>
-        </div>
+  const payload = {
+    message: text,
+    allow_code_changes: allowCodeEl.checked,
+    allow_shell: allowShellEl.checked,
+    approved_self_update: allowSelfUpdateEl.checked,
+    self_update_files: []
+  };
 
-        <section id="chat" class="chat-panel"></section>
+  const response = await fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
 
-        <div class="quick-actions">
-          <button type="button" class="chip" data-message="Search for the latest AI news">Search</button>
-          <button type="button" class="chip" data-message="Read file README.md">Read file</button>
-          <button type="button" class="chip" data-message="Write file notes.txt with content Hello from my assistant">Write file</button>
-        </div>
+  const data = await response.json();
+  addMessage('assistant', data.response);
 
-        <form id="chat-form" class="composer">
-          <input id="message" type="text" placeholder="Ask me to search, code, write, or update" autocomplete="off" />
-          <button type="submit">Send</button>
-        </form>
-      </main>
-    </div>
+  if (data.actions && data.actions.length) {
+    const actionList = data.actions.map((action) => JSON.stringify(action)).join('\n');
+    addMessage('system', `Actions:\n${actionList}`);
+  }
 
-    <script src="/static/app.js"></script>
-  </body>
-</html>
+  const brainResponse = await fetch('/api/brain');
+  const brainData = await brainResponse.json();
+  if (brainData.summary && brainData.summary.interaction_counts) {
+    const summaryText = brainData.summary.interaction_counts.map((item) => `${item.category}: ${item.count}`).join(', ');
+    addMessage('system', `Learning summary: ${summaryText}`);
+  }
+}
+
+formEl.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const value = inputEl.value.trim();
+  if (!value) return;
+  inputEl.value = '';
+  await sendMessage(value);
+});
+
+quickActionButtons.forEach((button) => {
+  button.addEventListener('click', () => {
+    inputEl.value = button.dataset.message;
+    formEl.requestSubmit();
+  });
+});
+
+if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+  const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SpeechRecognitionClass();
+  recognition.lang = 'en-US';
+  recognition.interimResults = false;
+  recognition.continuous = false;
+
+  recognition.onresult = (event) => {
+    const transcript = event.results[0][0].transcript;
+    inputEl.value = transcript;
+    sendMessage(transcript);
+  };
+
+  recognition.onerror = () => {
+    addMessage('assistant', 'I could not hear the microphone properly.');
+  };
+
+  voiceButtonEl.addEventListener('click', () => {
+    recognition.start();
+    addMessage('assistant', 'Listening...');
+  });
+} else {
+  voiceButtonEl.textContent = 'Voice unavailable';
+  voiceButtonEl.disabled = true;
+}
+
+addMessage('assistant', 'Welcome. I run locally on your computer and can help with voice, search, file work, learning, and explicit self-updates.');
