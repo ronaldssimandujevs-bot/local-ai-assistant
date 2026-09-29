@@ -1,4 +1,35 @@
-fastapi==0.111.0
-uvicorn==0.30.1
-jinja2==3.1.4
-requests==2.32.2
+import requests
+
+
+class LocalLLM:
+    def __init__(self, base_url="http://localhost:11434", model="llama3.2:latest"):
+        self.base_url = base_url.rstrip("/")
+        self.model = model
+
+    def is_available(self):
+        try:
+            return requests.get(f"{self.base_url}/api/tags", timeout=4).status_code == 200
+        except requests.RequestException:
+            return False
+
+    def generate_reply(self, prompt, memory=None, preferences=None):
+        return self._generate(self._build_prompt(prompt, memory, preferences), fallback="I am running locally. I can search the web, read pages, and generate code after you review it.")
+
+    def generate_code(self, request, path):
+        prompt = f"Generate only the complete source code for {path}. Task: {request}. Do not use Markdown fences or explanations."
+        return self._generate(prompt, fallback=f"# Code generation requested for {path}\n# Install Ollama and pull {self.model} for local code generation.\n")
+
+    def _generate(self, prompt, fallback):
+        if not self.is_available():
+            return fallback
+        try:
+            response = requests.post(f"{self.base_url}/api/generate", json={"model": self.model, "prompt": prompt, "stream": False}, timeout=120)
+            response.raise_for_status()
+            return response.json().get("response", fallback).strip()
+        except requests.RequestException:
+            return fallback
+
+    def _build_prompt(self, prompt, memory, preferences):
+        context = "\n".join(f"User: {x['user_input']}\nAssistant: {x['assistant_output']}" for x in (memory or [])[-4:])
+        prefs = "\n".join(f"{k}: {v}" for k, v in (preferences or {}).items())
+        return f"You are a careful local assistant. Preferences:\n{prefs}\nHistory:\n{context}\nUser: {prompt}\nAssistant:"

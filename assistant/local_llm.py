@@ -1,60 +1,38 @@
+import ipaddress
+import socket
+from urllib.parse import urlparse
+
 import requests
+from bs4 import BeautifulSoup
 
 
-class LocalLLM:
-    def __init__(self, base_url: str = "http://localhost:11434"):
-        self.base_url = base_url
-
-    def is_available(self) -> bool:
+class WebFetcher:
+    def _validate(self, url: str):
+        parsed = urlparse(url)
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+            raise ValueError("Only http and https URLs are supported.")
+        host = parsed.hostname.lower()
+        if host in {"localhost", "127.0.0.1", "::1"}:
+            raise ValueError("Local URLs are not allowed.")
         try:
-            result = requests.get(f"{self.base_url}/api/tags", timeout=4)
-            return result.status_code == 200
-        except requests.RequestException:
-            return False
+            addresses = socket.getaddrinfo(host, None)
+            for address in addresses:
+                ip = ipaddress.ip_address(address[4][0])
+                if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+                    raise ValueError("Private-network URLs are not allowed.")
+        except socket.gaierror as exc:
+            raise ValueError("The host could not be resolved.") from exc
 
-    def generate_reply(self, prompt: str, memory: list | None = None, preferences: dict | None = None) -> str:
-        if self.is_available():
-            try:
-                payload = {
-                    "model": "llama3.2:latest",
-                    "prompt": self._build_prompt(prompt, memory, preferences),
-                    "stream": False,
-                    "options": {"temperature": 0.6},
-                }
-                response = requests.post(f"{self.base_url}/api/generate", json=payload, timeout=60)
-                response.raise_for_status()
-                data = response.json()
-                return data.get("response", self._fallback_prompt(prompt, preferences)).strip()
-            except Exception:
-                return self._fallback_prompt(prompt, preferences)
-        return self._fallback_prompt(prompt, preferences)
-
-    def _build_prompt(self, prompt: str, memory: list | None, preferences: dict | None) -> str:
-        context = ""
-        if memory:
-            context = "\n".join(
-                [f"User: {item.get('user_input')}\nAssistant: {item.get('assistant_output')}" for item in memory[-4:]]
-            )
-
-        preference_context = ""
-        if preferences:
-            preference_context = "\n".join(f"Preference: {key} = {value}" for key, value in preferences.items())
-
-        return (
-            "You are a helpful local AI assistant. Follow the user's instructions carefully.\n"
-            f"User preferences:\n{preference_context}\n"
-            f"Current memory:\n{context}\n"
-            f"User: {prompt}\nAssistant:"
-        )
-
-    def _fallback_prompt(self, prompt: str, preferences: dict | None = None) -> str:
-        prompt_lower = prompt.lower()
-        if "search" in prompt_lower or "latest" in prompt_lower:
-            return "I can perform a web search when connected, and I can also keep a local memory of your previous requests. For a specific topic, ask me to search and I will fetch the latest available information."
-        if "code" in prompt_lower or "file" in prompt_lower or "modify" in prompt_lower:
-            return "I can read project files, create or modify content, and update the assistant itself when you explicitly authorize the change. I will explain the proposed change before executing it."
-        if "voice" in prompt_lower:
-            return "Voice input is available through the browser microphone. I can respond to spoken requests and help you control the local assistant with commands like 'open project', 'search for X', or 'create a file'."
-        if preferences:
-            return f"I remember your preferences and will adapt to them. Current context: {preferences}."
-        return "I am running locally and can help with research, file work, and software tasks. Tell me what you want to do, and I will guide the next step."
+    def fetch(self, url: str, max_bytes: int = 1_000_000):
+        self._validate(url)
+        response = requests.get(url, timeout=20, headers={"User-Agent": "Local-AI-Assistant/1.0"}, stream=True)
+        response.raise_for_status()
+        data = b""
+        for chunk in response.iter_content(8192):
+            data += chunk
+            if len(data) > max_bytes:
+                raise ValueError("The page is larger than the configured limit.")
+        soup = BeautifulSoup(data, "html.parser")
+        for tag in soup(["script", "style", "noscript"]):
+            tag.decompose()
+        return {"url": response.url, "title": soup.title.get_text(strip=True) if soup.title else response.url, "text": soup.get_text(" ", strip=True)}
