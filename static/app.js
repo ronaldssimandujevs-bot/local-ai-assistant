@@ -5,6 +5,7 @@ const voiceButtonEl = document.getElementById('voice-button');
 const allowCodeEl = document.getElementById('allow-code');
 const allowShellEl = document.getElementById('allow-shell');
 const allowSelfUpdateEl = document.getElementById('allow-self-update');
+const quickActionButtons = document.querySelectorAll('.chip');
 
 let recognition;
 
@@ -48,6 +49,13 @@ formEl.addEventListener('submit', async (event) => {
   if (!value) return;
   inputEl.value = '';
   await sendMessage(value);
+});
+
+quickActionButtons.forEach((button) => {
+  button.addEventListener('click', () => {
+    inputEl.value = button.dataset.message;
+    formEl.requestSubmit();
+  });
 });
 
 if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {

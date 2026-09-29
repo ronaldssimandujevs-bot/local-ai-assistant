@@ -7,7 +7,7 @@ body {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: 260px 1fr;
   height: 100vh;
 }
 
@@ -17,23 +17,39 @@ body {
   border-right: 1px solid #1f2937;
 }
 
-.sidebar h1 {
-  margin-top: 0;
+.brand-block h1 {
+  margin: 0;
+  font-size: 2rem;
 }
 
-.sidebar ul {
+.sidebar-section {
+  margin-top: 26px;
+}
+
+.section-label {
+  color: #94a3b8;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 10px;
+}
+
+.capability-list {
   list-style: none;
   padding: 0;
-  margin: 24px 0;
+  margin: 0;
 }
 
-.sidebar li {
-  margin: 12px 0;
+.capability-list li {
+  margin: 10px 0;
   color: #cbd5e1;
 }
 
-.toggle-row {
-  margin-top: 14px;
+.toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: #dbeafe;
 }
 
 .main-panel {
@@ -55,17 +71,54 @@ body {
   margin: 0;
   color: #94a3b8;
   font-size: 12px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
+.status-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 20px;
+  background: #0f172a;
+  border-bottom: 1px solid #1f2937;
+}
+
+.status-pill {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #1d4ed8;
+  color: #eff6ff;
+  font-size: 12px;
+}
+
+.status-pill.muted {
+  background: #1f2937;
+  color: #cbd5e1;
+}
+
 .primary-btn,
-.composer button {
+.composer button,
+.chip {
   background: #2563eb;
   color: white;
   border: none;
   border-radius: 8px;
   padding: 10px 16px;
   cursor: pointer;
+}
+
+.quick-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 12px 20px 0;
+}
+
+.chip {
+  background: #1f2937;
+  border: 1px solid #334155;
 }
 
 .chat-panel {

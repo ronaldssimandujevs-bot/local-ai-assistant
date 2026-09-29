@@ -9,20 +9,25 @@
   <body>
     <div class="app-shell">
       <aside class="sidebar">
-        <h1>Local AI</h1>
-        <ul>
-          <li>Voice</li>
-          <li>Search</li>
-          <li>Files</li>
-          <li>Self-update</li>
-        </ul>
-        <div class="toggle-row">
+        <div class="brand-block">
+          <p class="eyebrow">Local server</p>
+          <h1>AI Assistant</h1>
+        </div>
+
+        <div class="sidebar-section">
+          <p class="section-label">Capabilities</p>
+          <ul class="capability-list">
+            <li>Voice</li>
+            <li>Search</li>
+            <li>Files</li>
+            <li>Self-update</li>
+            <li>Learning memory</li>
+          </ul>
+        </div>
+
+        <div class="sidebar-section toggles">
           <label><input type="checkbox" id="allow-code" /> Allow code changes</label>
-        </div>
-        <div class="toggle-row">
           <label><input type="checkbox" id="allow-shell" /> Allow shell execution</label>
-        </div>
-        <div class="toggle-row">
           <label><input type="checkbox" id="allow-self-update" /> Allow self-update</label>
         </div>
       </aside>
@@ -30,16 +35,28 @@
       <main class="main-panel">
         <header class="topbar">
           <div>
-            <p class="eyebrow">Local server</p>
-            <h2>Computer Assistant</h2>
+            <p class="eyebrow">Computer assistant</p>
+            <h2>Local Execution Panel</h2>
           </div>
           <button id="voice-button" class="primary-btn">Start Voice</button>
         </header>
 
+        <div class="status-strip">
+          <span class="status-pill">Local mode</span>
+          <span class="status-pill muted">Safe execution</span>
+          <span class="status-pill muted">Learning on</span>
+        </div>
+
         <section id="chat" class="chat-panel"></section>
 
+        <div class="quick-actions">
+          <button type="button" class="chip" data-message="Search for the latest AI news">Search</button>
+          <button type="button" class="chip" data-message="Read file README.md">Read file</button>
+          <button type="button" class="chip" data-message="Write file notes.txt with content Hello from my assistant">Write file</button>
+        </div>
+
         <form id="chat-form" class="composer">
-          <input id="message" type="text" placeholder="Ask me to search, code, or update" autocomplete="off" />
+          <input id="message" type="text" placeholder="Ask me to search, code, write, or update" autocomplete="off" />
           <button type="submit">Send</button>
         </form>
       </main>

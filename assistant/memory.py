@@ -1,6 +1,5 @@
 import sqlite3
 from pathlib import Path
-from typing import Any
 
 
 class MemoryStore:
@@ -78,6 +77,13 @@ class MemoryStore:
         with self._connect() as conn:
             row = conn.execute("SELECT value FROM preferences WHERE key = ?", (key,)).fetchone()
             return row["value"] if row else None
+
+    def get_preferences(self):
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT key, value FROM preferences ORDER BY updated_at DESC"
+            ).fetchall()
+            return {row["key"]: row["value"] for row in rows}
 
     def get_recent(self, limit: int = 10):
         with self._connect() as conn:
