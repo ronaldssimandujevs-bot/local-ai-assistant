@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Local AI Assistant</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <h1>Local AI</h1>
+        <ul>
+          <li>Voice</li>
+          <li>Search</li>
+          <li>Files</li>
+          <li>Self-update</li>
+        </ul>
+        <div class="toggle-row">
+          <label><input type="checkbox" id="allow-code" /> Allow code changes</label>
+        </div>
+        <div class="toggle-row">
+          <label><input type="checkbox" id="allow-shell" /> Allow shell execution</label>
+        </div>
+        <div class="toggle-row">
+          <label><input type="checkbox" id="allow-self-update" /> Allow self-update</label>
+        </div>
+      </aside>
+
+      <main class="main-panel">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Local server</p>
+            <h2>Computer Assistant</h2>
+          </div>
+          <button id="voice-button" class="primary-btn">Start Voice</button>
+        </header>
+
+        <section id="chat" class="chat-panel"></section>
+
+        <form id="chat-form" class="composer">
+          <input id="message" type="text" placeholder="Ask me to search, code, or update" autocomplete="off" />
+          <button type="submit">Send</button>
+        </form>
+      </main>
+    </div>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
